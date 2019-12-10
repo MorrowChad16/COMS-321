@@ -1,0 +1,353 @@
+main:
+//BUILDS ARRAY OF LENTH 8 STARTING AT 8 AND DECREMENTING TO 1
+ADDI X0, XZR, #0
+ADDI X1, XZR, #56 //array_length = 7 * 8
+ADDI X2, XZR, #8 //numElements
+BL ARRAYBUILDER
+
+
+//TEST FOR SWAP
+//ADDI X2, XZR, #16
+//ADDI X3, XZR, #72
+//BL SWAP
+
+//TEST FOR FINDSMALLEST
+//ADDI X1, XZR, #10
+//ADDI X0, X0, #8
+//BL FINDSMALLEST
+
+//CALLS SELECTION SORT IN THE ARRAY BUILT ABOVE
+BL SELECTIONSORT
+
+ADDI X4, XZR, #53  //VALUE WE WANT TO LOOK FOR IS 5
+ADDI X1, XZR, #56  //LENGTH
+BL ITERATIVE_BINARY_SEARCH
+
+ADDI X0, XZR, #0
+ADDI X1, XZR, #0   //BEGINNING OF ARRAY
+ADDI X2, XZR, #7 //RIGHT SIDE
+ADDI X3, XZR, #7 //VALUE LOOKING FOR IS 7
+ADDI X4, XZR, #48 //constant value for finding ascii decimal value
+BL RECURSIVEBSEARCH
+
+B END //Stop program
+
+//////////////////////////////////////////////////////////////////////////
+//(X0 = array, X1 = size)
+ARRAYBUILDER:
+	SUBI SP, SP, #18
+	STUR LR, [SP, #0]
+
+	ADD X10, XZR, XZR //i
+	ADD X12, X1, XZR //temporary register for array.size()
+LOOPBUILD:
+	LSL X11, X10, #3 //i * 8
+	ADD X11, X0, X11 //X0 + i * 8
+	STUR X12, [X11, #0]
+	ADDI X10, X10, #1
+	SUBI X12, X12, #1 //array.size()-- 
+	SUBS X11, X2, X10 //length - i
+	B.GT LOOPBUILD
+
+	LDUR X9, [SP, #0]
+	ADDI SP, SP, #18
+	BR X9
+//////////////////////////////////////////////////////////////////////////
+//void swap(int *xp, int *yp) 
+//{ 
+//    int temp = *xp; 
+//    *xp = *yp; 
+//    *yp = temp; 
+//} 
+//////////////////////////////////////////////////////////////////////////
+//(X2 = register to swap, X3 = other register to swap)
+SWAP:
+	SUBI SP, SP, #18
+	STUR LR, [SP, #0]
+
+	LDUR X9, [X2, #0] //X9 = X10[X1 offset]
+	LDUR X11, [X3, #0] //X11 = X10[X2 offset]
+	STUR X11, [X2, #0] //X10[X1 offset] = X11
+	STUR X9, [X3, #0] //X10[X2 offset] = X9
+
+	LDUR X9, [SP, #0]
+	ADDI SP, SP, #18
+	BR X9
+//////////////////////////////////////////////////////////////////////////
+//void findSmallest(int arr[], int arr_size) 
+//{ 
+//    int i, first; 
+//  
+//    /* There should be atleast 1 element */
+//    if (arr_size < 1) 
+//    {  
+//        return; 
+//    } 
+//  
+//    first = arr[0]; 
+//    for (i = 1; i < arr_size ; i++) 
+//    { 
+//        if (arr[i] < first) 
+//        { 
+//           first = arr[i]; 
+//        } 
+//    } 
+//} 
+//////////////////////////////////////////////////////////////////////////
+//Parameters (X0 beginning, X1 array length)
+FINDSMALLEST: 
+
+	SUBI SP, SP, #18 //makes space on the stack
+	STUR LR, [SP, #0] //stores link register
+
+	ADD X11, XZR, XZR //minIndex/Offset
+
+	ADDI X10, X0, #8 //i = start + 1
+	ADD X11, XZR, X0 //minIndex/Offset is set to beginning of the array
+	
+	MIN_INDEX_LOOP:
+	
+		//if i > array.size() then exit
+		SUBS X12, X10, X1
+		B.GT MIN_END
+		
+		LDUR X13, [X10, #0] //X13 = array[i]
+		LDUR X14, [X11, #0] //X14 = array[minIndex]
+
+		//if array[minIndex] < array[i] then increment and loop
+		SUBS X15, X13, X14
+		B.GT NEXT
+		
+		//reassign minIndex and minOffset
+		ADD X11, XZR, X10 //update the minOffset
+			
+		NEXT:
+			ADDI X10, X10, #8  //currentOffset += 8
+			B MIN_INDEX_LOOP
+
+	MIN_END:
+		LDUR X9, [SP, #0]
+		ADDI SP, SP, #18
+		ADD LR, XZR, X11
+		BR X9
+		
+//////////////////////////////////////////////////////////////////////////
+//C SELECTION SORT CODE
+//void selectionSort(int arr[], int n) 
+//{ 
+  //  int i, j, min_idx; 
+  
+    // One by one move boundary of unsorted subarray 
+    //for (i = 0; i < n-1; i++) 
+    //{ 
+        // Find the minimum element in unsorted array 
+     //   min_idx = i; 
+       // for (j = i+1; j < n; j++) 
+         // if (arr[j] < arr[min_idx]) 
+           // min_idx = j; 
+  
+        // Swap the found minimum element with the first element 
+     //   swap(&arr[min_idx], &arr[i]); 
+    //} 
+//} 
+//////////////////////////////////////////////////////////////////////////
+
+//(X1 arrayLength)
+SELECTIONSORT:
+	SUBI SP, SP, #18 //manipulates stack
+	STUR LR, [SP, #0] 
+	STUR X1, [SP, #8] //array.size()
+	STUR XZR, [SP, #16] //array[i]
+	
+	ADD X9, XZR, XZR //initializes i to 0, in case another value was never cleared
+	STUR X9, [SP, #16] //stores the current index starting point (0)
+	
+	SORTFORLOOP:
+		LDUR X1, [SP, #8] //grabs the array.size() of the array
+	
+		ADD X17, XZR, XZR //clears X17, ran into issue where register was overlapping from subtracting so much that it turned into a massive number
+		SUBS X17, X9, X1 //X17 = i - array.size()
+		B.GE SELECTIONEND //if i >= array.size() then we're done
+		
+		ADD X0, XZR, X9 //startIndex = i
+		
+	
+		
+		BL FINDSMALLEST //FIND THE SMALLEST VALUE IN THE ARRAY X0
+		
+		ADD X2, XZR, LR 	//adds smallest value offset into X2	
+		LDUR X3, [SP, #16]  //adds currentIndex to swap into X3	
+		
+		BL SWAP 
+		
+		LDUR X9, [SP, #16] //loads i into X9
+		ADDI X9, X9, #8 //i++
+		STUR X9, [SP, #16] //stores the updated i into the SP
+		
+		B SORTFORLOOP
+	
+	SELECTIONEND:
+		LDUR X9, [SP, #0]
+		ADDI SP, SP, #18
+		BR X9
+//////////////////////////////////////////////////////////////////////////
+//int binarySearch(int arr[], int l, int r, int x) 
+//{ 
+  //  while (l <= r) { 
+    //    int m = l + (r - l) / 2; 
+  
+        // Check if x is present at mid 
+      //  if (arr[m] == x) 
+        //    return m; 
+  
+        // If x greater, ignore left half 
+        //if (arr[m] < x) 
+          //  l = m + 1; 
+  
+        // If x is smaller, ignore right half 
+        //else
+          //  r = m - 1; 
+    //} 
+  
+    // if we reach here, then element was 
+    // not present 
+    //return -1; 
+//} 
+//////////////////////////////////////////////////////////////////////////
+//Parameters(X4 value we are looking for, X2: LENGTH)
+ITERATIVE_BINARY_SEARCH: 
+	SUBI SP, SP, #20 
+	STUR LR, [SP, #0] 
+
+	LSR X17, X3, #3
+	
+	IT_BINARY_WHILE:
+		
+		SUB X16, X17, X15	//RIGHT - LEFT
+		ADD X16, X16, X15	//X16 += X15
+		
+		ADD X14, XZR, X16	
+		LSL X14, X14, #3	//MULTIPLY BY 8
+		LDUR X13, [X14, #0]	
+
+		SUBS X12, X13, X4	//COMPARE MID AND VALUE
+
+		B.EQ BINARY_FINISH //If our value is at mid, then we're done
+
+		B.GT RIGHT_SIDE //If our value is greater than our mid, then go to the right side
+		
+		B LEFT_SIDE //Else our value is less than the mid, go to the left
+		
+	LEFT_SIDE:
+		ADDI X15, X16, #1 //LEFT SIDE IS MIDDLE +1
+		B IT_BINARY_WHILE 	
+		
+	RIGHT_SIDE:
+		SUBI X17, X16, #1 //RIGHT SIDE IS MIDDLE - 1
+		B IT_BINARY_WHILE	
+		
+	BINARY_FINISH:		
+		LDUR X18, [SP, #0]
+		ADDI SP, SP, #20
+		ADD X19, XZR, X16
+		BR X18
+		
+//////////////////////////////////////////////////////////////////////////
+//int binarySearch(int arr[], int l, int r, int x) 
+//{ 
+//    if (r >= l) { 
+//        int mid = l + (r - l) / 2; 
+//  
+//        // If the element is present at the middle 
+//        // itself 
+//        if (arr[mid] == x) 
+//            return mid; 
+//  
+//        // If element is smaller than mid, then 
+//        // it can only be present in left subarray 
+//        if (arr[mid] > x) 
+//            return binarySearch(arr, l, mid - 1, x); 
+//  
+//        // Else the element can only be present 
+//        // in right subarray 
+//        return binarySearch(arr, mid + 1, r, x); 
+//    } 
+//  
+//    // We reach here when element is not 
+//    // present in array 
+//    return -1; 
+//}
+//////////////////////////////////////////////////////////////////////////
+RECURSIVEBSEARCH: //X0 is the array, X1 is the start index, X2 is the end index, X3 is the target
+	SUBS X8, X1, X2
+	B.GT EXITRECURSIVEBAD //if the start is greater than the end then exit
+	
+	SUB X12, X2, X1 //endIndex - startIndex
+	LSR X12, X12, #1 //(endIndex - startIndex) / 2
+	ADD X9, X1, X12 //startIndex + midIndex
+	ADD X12, XZR, X9 //midIndex
+	LSL X9, X9, #3 //* 8
+	ADD X9, X0, X9 //array + (X9 * 8)
+	LDUR X9, [X9, #0] //load in ascii value of arr[midIndex]
+	SUB X9, X9, X4 //CONVERT ASCII TO DECIMAL == midValue
+
+	SUBS X8, X3, X9 //target - midValue
+	B.EQ EXITRECURSIVE //target == midValue
+	B.GT RECURSIVESTART //target < midValue
+	B RECURSIVEEND //target > midValue
+	
+	RECURSIVESTART:
+	ADDI X1, X12, #1 //startIndex = midIndex + 1
+	BL RECURSIVEBSEARCH
+	
+	RECURSIVEEND:
+	SUBI X2, X9, #1 //endindex = midIndex - 1
+	BL RECURSIVEBSEARCH
+	
+	EXITRECURSIVE:
+	ADD X20, XZR, X12 //Stores index into X20
+	B END
+	
+	EXITRECURSIVEBAD:
+	ADDI X20, XZR, #420 //Stores 420 into X20 if unable to find the value
+	PRNT X20
+	B END
+	
+//OLD VERSION, DIDN'T WORK	
+//RECURSIVEBSEARCH: //X0 is the array, X1 is the start index, X2 is the end index, X3 is the target
+//	
+//	SUBI SP, SP, #18
+//	STUR LR, [SP, #0]
+//	
+//	SUBS X8, X2, X1
+//	B.GT EXITRECURSIVE //if the start is greater than the end then exit
+//	
+//	ADD X9, X1, X2 //SET UP X9 AS THE MID INDEX
+//	LSR X9, X9, #1 //shift right by one spot to divide by 2
+//	
+//	LSL X10, X9, #3
+//	ADD X10, X10, X0
+//	LDUR X10, [X10, #0]
+//	
+//	SUBS X8, X10, X3
+//	B.EQ EXITRECURSIVE //arr[i] == mid
+//	B.LT RECURSIVESTART //arr[i] < mid
+//	B.GT RECURSIVEEND //arr[i] > mid
+//	
+//	RECURSIVESTART:
+//	ADDI X1, X9, #1 //startIndex = mid + 1
+//	BL RECURSIVEBSEARCH
+//	
+//	RECURSIVEEND:
+//	SUBI X2, X9, #1 //endindex = mid - 1
+//	BL RECURSIVEBSEARCH
+//	
+//	EXITRECURSIVE:
+//	ADD X20, XZR, X9 //store our output into X20
+//	LDUR X11, [SP, #0]
+//	ADDI SP, SP, #18
+//	BR X11
+
+END:
+	DUMP
+
